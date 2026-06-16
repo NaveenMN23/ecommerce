@@ -12,7 +12,11 @@
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'"
   },
-  "keywords": ["ecommerce", "typescript", "express"],
+  "keywords": [
+    "ecommerce",
+    "typescript",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -22,6 +26,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
     "@types/supertest": "^7.2.0",
     "@types/uuid": "^10.0.0",
