@@ -11,6 +11,8 @@ app.listen(config.PORT, () => {
   console.log('\nRoutes:');
   console.log('  GET    /api/products');
   console.log('  POST   /api/cart/:userId/items');
+  console.log('  PUT    /api/cart/:userId/items/:productId');
+  console.log('  DELETE /api/cart/:userId/items/:productId');
   console.log('  GET    /api/cart/:userId');
   console.log('  POST   /api/checkout/:userId');
   console.log('  POST   /api/admin/coupons/generate');

@@ -48,3 +48,9 @@ export class CouponAlreadyUsedError extends AppError {
     super(`Coupon '${code}' has already been used.`, 400);
   }
 }
+
+export class CartItemNotFoundError extends AppError {
+  constructor(productId: string) {
+    super(`Item '${productId}' not found in cart.`, 404);
+  }
+}

@@ -76,4 +76,95 @@ router.post('/:userId/items', CartController.addItem);
  */
 router.get('/:userId', CartController.viewCart);
 
+/**
+ * @swagger
+ * /api/cart/{userId}/items/{productId}:
+ *   put:
+ *     tags: [Cart]
+ *     summary: Update item quantity
+ *     description: |
+ *       Sets the quantity of an existing cart item to a new absolute value.
+ *       Pass `quantity: 0` to remove the item.
+ *       Unlike the add endpoint, this is a SET operation — it does not add on top of existing quantity.
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *         example: user2
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: string }
+ *         example: p1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quantity]
+ *             properties:
+ *               quantity: { type: integer, minimum: 0, example: 46, description: "0 removes the item" }
+ *     responses:
+ *       200:
+ *         description: Cart updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 cart:    { $ref: '#/components/schemas/Cart' }
+ *                 total:   { type: number }
+ *       400:
+ *         description: Invalid quantity or insufficient stock
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404:
+ *         description: Cart or item not found
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.put('/:userId/items/:productId', CartController.updateItem);
+
+/**
+ * @swagger
+ * /api/cart/{userId}/items/{productId}:
+ *   delete:
+ *     tags: [Cart]
+ *     summary: Remove item from cart
+ *     description: Removes a specific product from the user's cart entirely.
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *         example: user1
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: string }
+ *         example: p1
+ *     responses:
+ *       200:
+ *         description: Item removed, updated cart returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 cart:    { $ref: '#/components/schemas/Cart' }
+ *                 total:   { type: number }
+ *       404:
+ *         description: Cart or item not found
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.delete('/:userId/items/:productId', CartController.removeItem);
+
 export default router;
