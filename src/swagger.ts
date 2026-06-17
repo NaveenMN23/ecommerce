@@ -58,7 +58,7 @@ const options: swaggerJsdoc.Options = {
             userId:          { type: 'string', nullable: true, example: 'user1' },
             discountPercent: { type: 'number', example: 10 },
             minOrderAmount:  { type: 'number', example: 1500 },
-            isUsed:          { type: 'boolean', example: false },
+            redeemedBy:      { type: 'array', items: { type: 'string' }, example: ['user1'], description: 'USER_SPECIFIC: max 1 entry. GLOBAL: one entry per user who redeemed it.' },
             createdAt:       { type: 'string', format: 'date-time' },
           },
         },

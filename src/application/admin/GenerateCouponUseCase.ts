@@ -63,7 +63,7 @@ export class GenerateCouponUseCase {
       userId,
       discountPercent: DISCOUNT_CONFIG.TIERS.USER_SPECIFIC.discountPercent,
       minOrderAmount: DISCOUNT_CONFIG.TIERS.USER_SPECIFIC.minOrderAmount,
-      isUsed: false,
+      redeemedBy: [],
       createdAt: new Date(),
     };
 
@@ -90,7 +90,7 @@ export class GenerateCouponUseCase {
       type: 'GLOBAL',
       discountPercent: tierConfig.discountPercent,
       minOrderAmount: tierConfig.minOrderAmount,
-      isUsed: false,
+      redeemedBy: [],
       createdAt: new Date(),
     };
 

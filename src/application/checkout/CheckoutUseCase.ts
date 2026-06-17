@@ -60,7 +60,14 @@ export class CheckoutUseCase {
     if (couponCode) {
       const coupon = this.store.coupons.get(couponCode);
       if (!coupon) throw new CouponNotFoundError(couponCode);
-      if (coupon.isUsed) throw new CouponAlreadyUsedError(couponCode);
+      // USER_SPECIFIC: single-use globally — once the owner redeems it, it's gone
+      if (coupon.type === 'USER_SPECIFIC' && coupon.redeemedBy.length > 0) {
+        throw new CouponAlreadyUsedError(couponCode);
+      }
+      // GLOBAL: single-use per user — each user may redeem it once
+      if (coupon.type === 'GLOBAL' && coupon.redeemedBy.includes(userId)) {
+        throw new AppError(`You have already used coupon '${couponCode}'.`, 400);
+      }
 
       // USER_SPECIFIC coupons are bound to the user who earned them
       if (coupon.type === 'USER_SPECIFIC' && coupon.userId !== userId) {
@@ -77,9 +84,8 @@ export class CheckoutUseCase {
       discountAmount = calculateDiscount(subtotal, coupon.discountPercent);
       appliedCouponCode = couponCode;
 
-      // Mark coupon consumed — in production this is an atomic CAS to prevent double-spend
-      coupon.isUsed = true;
-      coupon.usedAt = new Date();
+      // Record redemption — in production this is an atomic CAS to prevent double-spend
+      coupon.redeemedBy.push(userId);
       this.store.coupons.set(couponCode, coupon);
     }
 

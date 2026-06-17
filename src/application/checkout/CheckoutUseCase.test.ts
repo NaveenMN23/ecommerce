@@ -41,7 +41,7 @@ function validCoupon(overrides: Partial<Coupon> = {}): Coupon {
     type: 'GLOBAL',
     discountPercent: 10,
     minOrderAmount: 1500,
-    isUsed: false,
+    redeemedBy: [],
     createdAt: new Date(),
     ...overrides,
   };
@@ -121,13 +121,22 @@ describe('CheckoutUseCase', () => {
       ).toThrow(CouponNotFoundError);
     });
 
-    it('throws CouponAlreadyUsedError for a used coupon', () => {
+    it('throws CouponAlreadyUsedError for a USER_SPECIFIC coupon already redeemed', () => {
       const store = makeStore({ products: new Map([['p1', { ...product }]]) });
       store.carts.set('user1', cartWith('p1', 1));
-      store.coupons.set('UNIBLOX-TEST01', validCoupon({ isUsed: true }));
+      store.coupons.set('UNIBLOX-TEST01', validCoupon({ type: 'USER_SPECIFIC', userId: 'user1', redeemedBy: ['user1'] }));
       expect(() =>
         new CheckoutUseCase(store).execute({ userId: 'user1', couponCode: 'UNIBLOX-TEST01' })
       ).toThrow(CouponAlreadyUsedError);
+    });
+
+    it('throws AppError when user tries to reuse a GLOBAL coupon they already redeemed', () => {
+      const store = makeStore({ products: new Map([['p1', { ...product }]]) });
+      store.carts.set('user1', cartWith('p1', 1));
+      store.coupons.set('UNIBLOX-TEST01', validCoupon({ type: 'GLOBAL', redeemedBy: ['user1'] }));
+      expect(() =>
+        new CheckoutUseCase(store).execute({ userId: 'user1', couponCode: 'UNIBLOX-TEST01' })
+      ).toThrow(AppError);
     });
 
     it('throws AppError when USER_SPECIFIC coupon belongs to another user', () => {
@@ -165,28 +174,43 @@ describe('CheckoutUseCase', () => {
       expect(order.discountCode).toBe('UNIBLOX-TEST01');
     });
 
-    it('marks coupon as used after checkout', () => {
+    it('records userId in redeemedBy after checkout', () => {
       const store = makeStore({ products: new Map([['p1', { ...product }]]) });
       store.carts.set('user1', cartWith('p1', 1));
       store.coupons.set('UNIBLOX-TEST01', validCoupon());
       new CheckoutUseCase(store).execute({ userId: 'user1', couponCode: 'UNIBLOX-TEST01' });
 
-      expect(store.coupons.get('UNIBLOX-TEST01')!.isUsed).toBe(true);
+      expect(store.coupons.get('UNIBLOX-TEST01')!.redeemedBy).toContain('user1');
     });
 
-    it('prevents double-use of the same coupon', () => {
+    it('allows a different user to use a GLOBAL coupon after first redemption', () => {
       const store = makeStore({ products: new Map([['p1', { ...product }]]) });
-      store.coupons.set('UNIBLOX-TEST01', validCoupon());
+      store.coupons.set('UNIBLOX-TEST01', validCoupon({ type: 'GLOBAL' }));
+
+      // user1 redeems
+      store.carts.set('user1', cartWith('p1', 1));
+      new CheckoutUseCase(store).execute({ userId: 'user1', couponCode: 'UNIBLOX-TEST01' });
+
+      // user2 can still use it
+      store.products.set('p1', { ...product }); // restore stock
+      store.carts.set('user2', cartWith('p1', 1));
+      const { order } = new CheckoutUseCase(store).execute({ userId: 'user2', couponCode: 'UNIBLOX-TEST01' });
+      expect(order.discountAmount).toBe(200); // 10% of ₹2000
+    });
+
+    it('prevents a user from reusing a GLOBAL coupon they already redeemed', () => {
+      const store = makeStore({ products: new Map([['p1', { ...product }]]) });
+      store.coupons.set('UNIBLOX-TEST01', validCoupon({ type: 'GLOBAL' }));
 
       // First checkout
       store.carts.set('user1', cartWith('p1', 1));
       new CheckoutUseCase(store).execute({ userId: 'user1', couponCode: 'UNIBLOX-TEST01' });
 
-      // Second checkout with same coupon
+      // user1 tries again — blocked
       store.carts.set('user1', cartWith('p1', 1));
       expect(() =>
         new CheckoutUseCase(store).execute({ userId: 'user1', couponCode: 'UNIBLOX-TEST01' })
-      ).toThrow(CouponAlreadyUsedError);
+      ).toThrow(AppError);
     });
   });
 

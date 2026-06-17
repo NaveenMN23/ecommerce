@@ -101,6 +101,20 @@ router.get('/coupons', AdminController.listCoupons);
  *                     totalItemsPurchased: { type: integer, example: 12 }
  *                     totalRevenue:       { type: number, example: 31609.1 }
  *                     totalDiscountGiven: { type: number, example: 179.9 }
+ *                     topSellingProduct:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         productId: { type: string, example: p5 }
+ *                         name:      { type: string, example: "Desk Lamp" }
+ *                         value:     { type: integer, example: 8, description: "Units sold" }
+ *                     topRevenueProduct:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         productId: { type: string, example: p2 }
+ *                         name:      { type: string, example: "Mechanical Keyboard" }
+ *                         value:     { type: number, example: 8998, description: "Total revenue in ₹" }
  *                     coupons:
  *                       type: array
  *                       items: { $ref: '#/components/schemas/Coupon' }
@@ -136,6 +150,17 @@ router.get('/stats', AdminController.getStats);
  *                     totalItemsPurchased: { type: integer }
  *                     totalRevenue:       { type: number }
  *                     totalDiscountGiven: { type: number }
+ *                     favoriteProduct:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         productId: { type: string, example: p1 }
+ *                         name:      { type: string, example: "Wireless Headphones" }
+ *                         value:     { type: integer, example: 3, description: "Units purchased by this user" }
+ *                     orders:
+ *                       type: array
+ *                       description: Full purchase history for this user
+ *                       items: { $ref: '#/components/schemas/Order' }
  *                     coupons:
  *                       type: array
  *                       items: { $ref: '#/components/schemas/Coupon' }

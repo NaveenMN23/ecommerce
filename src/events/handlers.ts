@@ -24,7 +24,7 @@ export function registerCouponHandler(): void {
       userId,
       discountPercent: DISCOUNT_CONFIG.TIERS.USER_SPECIFIC.discountPercent,
       minOrderAmount: DISCOUNT_CONFIG.TIERS.USER_SPECIFIC.minOrderAmount,
-      isUsed: false,
+      redeemedBy: [],
       createdAt: new Date(),
     });
 
