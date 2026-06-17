@@ -1,4 +1,8 @@
 import app from './app';
+import { registerAllHandlers } from './events/handlers';
+
+// Register all event handlers before the server starts accepting requests
+registerAllHandlers();
 
 const PORT = process.env.PORT || 3000;
 

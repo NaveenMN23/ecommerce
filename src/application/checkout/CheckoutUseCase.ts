@@ -14,6 +14,7 @@ import {
   applyDiscount,
   nextCouponAt,
 } from '../../domain/rules/DiscountRule';
+import { eventBus } from '../../events/EventBus';
 
 interface CheckoutInput {
   userId: string;
@@ -113,9 +114,10 @@ export class CheckoutUseCase {
     // 8. Clear cart
     this.store.carts.delete(userId);
 
-    // Post-order side effects (coupon generation, stats) are handled by
-    // EventBus listeners on the 'order.placed' event — not here.
-    // CheckoutUseCase responsibility ends at placing the order.
+    // 9. Emit event — CheckoutUseCase's responsibility ends here.
+    // Handlers (coupon generation, analytics) react independently.
+    // If a handler throws, it does not affect the order response.
+    eventBus.emit('order.placed', { order, userId, userCount });
 
     return {
       order,
