@@ -97,7 +97,7 @@ npm test                 # run all tests
 npm run test:coverage    # run with coverage report
 ```
 
-**63 tests across 5 suites — all passing.**
+**79 tests across 7 suites — all passing.**
 
 | Suite | Tests |
 |-------|-------|
@@ -106,6 +106,8 @@ npm run test:coverage    # run with coverage report
 | CheckoutUseCase | 16 |
 | GenerateCouponUseCase | 10 |
 | UpdateCartItemUseCase | 11 |
+| PreviewCheckoutUseCase | 11 |
+| GetOrderHistoryUseCase | 5 |
 
 ---
 
@@ -310,3 +312,46 @@ Or import `postman/uniblox-ecommerce.json` into Postman and run the collection.
 | **Observability** | Structured JSON logs (already in place); OpenTelemetry spans per use case; Datadog for p99 latency |
 | **Multi-tenancy** | tenantId on every entity; AppStore interface enforces isolation at the repository layer |
 | **Scale** | Stateless Express instances behind an ALB; Redis cluster for shared state |
+
+---
+
+## At Production Scale
+
+How this service fits into a production infrastructure. The Clean Architecture and
+`AppStore` interface mean the code changes are minimal — mostly swapping the store
+implementation and adding an SQS publisher.
+
+```
+Client
+  │
+  ▼
+┌──────────────────────────────────────────────┐
+│   API Gateway  (rate limiting · JWT verify)  │
+└─────────────────────┬────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          ▼                       ▼
+  ┌───────────────┐       ┌───────────────┐   stateless — scale horizontally
+  │  Express #1   │       │  Express #2   │   behind an Application Load Balancer
+  └───────┬───────┘       └───────┬───────┘
+          └──────────┬────────────┘
+                     │
+       ┌─────────────┼──────────────┐
+       ▼             ▼              ▼
+┌────────────┐ ┌───────────┐ ┌───────────┐
+│   Redis    │ │ Postgres  │ │    SQS    │
+│ · cart     │ │ · orders  │ │ order.    │
+│ · sessions │ │ · products│ │ placed    │
+│ · idempot. │ │ · coupons │ └─────┬─────┘
+│ · counters │ │ (SOC2)    │       │
+└────────────┘ └───────────┘  ┌────┴─────────────┐
+                               ▼                  ▼
+                         CouponWorker    AnalyticsWorker
+                         (Lambda/ECS)    (Lambda/ECS)
+```
+
+**What changes from this codebase to that diagram:**
+- `InMemoryStore` → `RedisStore` + `PostgresStore` (both implement `AppStore` — no domain changes)
+- `TypedEventBus.emit()` → publish to SQS (same interface, different implementation)
+- `CheckoutController` reads `Idempotency-Key` header, checks Redis before delegating to the use case
+- JWT middleware on every route reads `req.user.id` instead of `req.params.userId`
