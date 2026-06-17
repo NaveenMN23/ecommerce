@@ -14,7 +14,7 @@ import {
   applyDiscount,
   nextCouponAt,
 } from '../../domain/rules/DiscountRule';
-import { eventBus } from '../../events/EventBus';
+import { TypedEventBus, eventBus } from '../../events/EventBus';
 
 interface CheckoutInput {
   userId: string;
@@ -31,7 +31,10 @@ export interface CheckoutResult {
 }
 
 export class CheckoutUseCase {
-  constructor(private readonly store: AppStore) {}
+  constructor(
+    private readonly store: AppStore,
+    private readonly bus: TypedEventBus = eventBus
+  ) {}
 
   execute(input: CheckoutInput): CheckoutResult {
     const { userId, couponCode } = input;
@@ -123,7 +126,7 @@ export class CheckoutUseCase {
     // 9. Emit event — CheckoutUseCase's responsibility ends here.
     // Handlers (coupon generation, analytics) react independently.
     // If a handler throws, it does not affect the order response.
-    eventBus.emit('order.placed', { order, userId, userCount });
+    this.bus.emit('order.placed', { order, userId, userCount });
 
     return {
       order,

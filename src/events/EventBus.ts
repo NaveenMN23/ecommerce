@@ -14,7 +14,7 @@ export interface EventMap {
   };
 }
 
-class TypedEventBus {
+export class TypedEventBus {
   private emitter = new EventEmitter();
 
   emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): void {

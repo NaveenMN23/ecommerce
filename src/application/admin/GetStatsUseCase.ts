@@ -58,7 +58,7 @@ export class GetStatsUseCase {
       (o) => o.userId === userId
     );
     const userCoupons = Array.from(this.store.coupons.values()).filter(
-      (c) => c.userId === userId || c.type === 'GLOBAL'
+      (c) => c.userId === userId || c.redeemedBy.includes(userId)
     );
     const base = this.aggregateBase(userOrders);
 
