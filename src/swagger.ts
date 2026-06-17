@@ -12,6 +12,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [{ url: 'http://localhost:3000', description: 'Local development' }],
     tags: [
+      { name: 'Products', description: 'Browse the product catalog' },
       { name: 'Cart',     description: 'Add items and manage the shopping cart' },
       { name: 'Checkout', description: 'Place orders and apply discount coupons' },
       { name: 'Admin',    description: 'Generate coupons and view store statistics' },

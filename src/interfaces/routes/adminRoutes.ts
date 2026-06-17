@@ -1,0 +1,145 @@
+import { Router } from 'express';
+import { AdminController } from '../controllers/AdminController';
+
+const router = Router();
+
+/**
+ * @swagger
+ * /api/admin/coupons/generate:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Generate a discount coupon
+ *     description: |
+ *       Generates a coupon based on type:
+ *       - **USER_SPECIFIC**: Requires `userId`. Checks if user has hit the nth-order milestone (every 5th order).
+ *         Returns `success: false` with reason if condition is not met.
+ *       - **GLOBAL**: No condition check. Admin-triggered campaign coupon usable by anyone.
+ *         Use `tier: TIER2` for 10% off ₹2000+ (default TIER1 is 7.5% off ₹1500+).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [type]
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [USER_SPECIFIC, GLOBAL]
+ *                 example: USER_SPECIFIC
+ *               userId:
+ *                 type: string
+ *                 example: user1
+ *                 description: Required when type is USER_SPECIFIC
+ *               tier:
+ *                 type: string
+ *                 enum: [TIER1, TIER2]
+ *                 example: TIER1
+ *                 description: Only for GLOBAL. TIER1=7.5% off ₹1500+, TIER2=10% off ₹2000+
+ *     responses:
+ *       200:
+ *         description: Result (success true or false — both are 200, not an error)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 coupon:  { $ref: '#/components/schemas/Coupon' }
+ *                 message: { type: string, example: "Condition not met. Next coupon at order #10." }
+ *       400:
+ *         description: Invalid type or missing userId
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.post('/coupons/generate', AdminController.generateCoupon);
+
+/**
+ * @swagger
+ * /api/admin/coupons:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List all coupons
+ *     description: Returns every coupon in the store with its current usage status.
+ *     responses:
+ *       200:
+ *         description: All coupons
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 total:   { type: integer }
+ *                 coupons:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Coupon' }
+ */
+router.get('/coupons', AdminController.listCoupons);
+
+/**
+ * @swagger
+ * /api/admin/stats:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Store-wide stats
+ *     description: Returns total orders, items purchased, revenue, and discounts given across all users.
+ *     responses:
+ *       200:
+ *         description: Aggregated store stats
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     totalOrders:        { type: integer, example: 6 }
+ *                     totalItemsPurchased: { type: integer, example: 12 }
+ *                     totalRevenue:       { type: number, example: 31609.1 }
+ *                     totalDiscountGiven: { type: number, example: 179.9 }
+ *                     coupons:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/Coupon' }
+ */
+router.get('/stats', AdminController.getStats);
+
+/**
+ * @swagger
+ * /api/admin/stats/{userId}:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Stats for a specific user
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *         example: user1
+ *     responses:
+ *       200:
+ *         description: User-scoped stats
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 userId:  { type: string }
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     totalOrders:        { type: integer }
+ *                     totalItemsPurchased: { type: integer }
+ *                     totalRevenue:       { type: number }
+ *                     totalDiscountGiven: { type: number }
+ *                     coupons:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/Coupon' }
+ */
+router.get('/stats/:userId', AdminController.getUserStats);
+
+export default router;
