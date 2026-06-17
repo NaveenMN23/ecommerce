@@ -5,6 +5,7 @@ import productRoutes from './interfaces/routes/productRoutes';
 import cartRoutes from './interfaces/routes/cartRoutes';
 import checkoutRoutes from './interfaces/routes/checkoutRoutes';
 import adminRoutes from './interfaces/routes/adminRoutes';
+import orderRoutes from './interfaces/routes/orderRoutes';
 import { errorHandler } from './interfaces/middleware/errorHandler';
 
 const app: Application = express();
@@ -19,6 +20,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {

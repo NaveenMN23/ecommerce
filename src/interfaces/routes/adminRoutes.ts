@@ -11,9 +11,15 @@ const router = Router();
  *     summary: Generate a discount coupon
  *     description: |
  *       Generates a coupon based on type:
- *       - **USER_SPECIFIC**: Requires `userId`. Checks if user has hit the nth-order milestone (every 5th order).
- *         Returns `success: false` with reason if condition is not met.
- *       - **GLOBAL**: No condition check. Admin-triggered campaign coupon usable by anyone.
+ *
+ *       - **USER_SPECIFIC**: Manual override / fallback only. USER_SPECIFIC coupons are
+ *         **auto-generated** by the checkout event handler on every nth order (default every 5th)
+ *         — no admin action is required. Use this endpoint only if auto-generation failed or to
+ *         test manually. Requires `userId`. Returns `success: false` if the user hasn't hit
+ *         the milestone yet (this is a valid business state, not an error).
+ *
+ *       - **GLOBAL**: Always manual — admin decides when to run a discount campaign.
+ *         Usable by any user, but each user can only redeem it once (`redeemedBy` tracks this).
  *         Use `tier: TIER2` for 10% off ₹2000+ (default TIER1 is 7.5% off ₹1500+).
  *     requestBody:
  *       required: true

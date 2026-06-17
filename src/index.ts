@@ -20,6 +20,7 @@ app.listen(config.PORT, () => {
   console.log('  GET    /api/admin/coupons');
   console.log('  GET    /api/admin/stats');
   console.log('  GET    /api/admin/stats/:userId');
+  console.log('  GET    /api/orders/:userId');
   console.log('  GET    /health');
   console.log(`\n  API Docs: http://localhost:${config.PORT}/api-docs\n`);
 });
