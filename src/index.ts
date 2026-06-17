@@ -14,6 +14,7 @@ app.listen(config.PORT, () => {
   console.log('  PUT    /api/cart/:userId/items/:productId');
   console.log('  DELETE /api/cart/:userId/items/:productId');
   console.log('  GET    /api/cart/:userId');
+  console.log('  POST   /api/checkout/:userId/preview');
   console.log('  POST   /api/checkout/:userId');
   console.log('  POST   /api/admin/coupons/generate');
   console.log('  GET    /api/admin/coupons');
