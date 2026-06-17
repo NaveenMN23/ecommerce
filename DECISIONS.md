@@ -75,6 +75,8 @@ history, one for general campaigns.
 
 **Why:** The two types have fundamentally different redemption rules. USER_SPECIFIC coupons check `coupon.userId === requestingUserId` at checkout — a global coupon doesn't. USER_SPECIFIC are earned (10% off ₹1500+); GLOBAL are issued as campaigns (TIER1: 7.5% off ₹1500+, TIER2: 10% off ₹2000+). Merging them into one type would require nullable fields and conditional logic at every validation point. Keeping them separate makes each path explicit, testable independently, and extensible — a TIER3 coupon is one more entry in `DISCOUNT_CONFIG.TIERS`. The `userId?: string` field encodes the entire binding rule: if present, only that user may redeem; if absent, anyone may.
 
+Redemption state is tracked via `redeemedBy: string[]` rather than `isUsed: boolean`. A boolean would block all users from a GLOBAL coupon the moment the first user redeems it. The array lets USER_SPECIFIC check `length > 0` and GLOBAL check `.includes(userId)` — both rules in one field, no second entity. In production this maps to a `coupon_redemptions(coupon_code, user_id, redeemed_at)` table with a unique constraint on `(coupon_code, user_id)`.
+
 ---
 
 ## Decision 5: EventEmitter Fan-out for Post-Order Side Effects
@@ -154,27 +156,15 @@ All routes are open. `userId` is taken from the URL parameter — any caller can
 
 Production fix: Auth0 or AWS Cognito issues JWTs. An Express middleware validates the token on every request and sets `req.user`. Controllers read `req.user.id` instead of `req.params.userId`. Admin routes (`/api/admin/*`) require an additional `role: admin` claim check. Zero domain or use-case changes required — auth is enforced entirely at the interface layer, consistent with Clean Architecture's dependency rule.
 
----
+**Limitation 4: Floating-point money**
 
-## Decision 9: GLOBAL Coupon Redemption via `redeemedBy: string[]`
+All monetary values — `price`, `discountAmount`, `total`, `totalRevenue` — are stored as TypeScript `number` (IEEE 754 double). `0.1 + 0.2 = 0.30000000000000004`. The `roundMoney()` helper in `GetStatsUseCase` prevents drift from appearing in API responses but does not fix intermediate arithmetic. For an in-memory assignment with no persistence this is acceptable.
 
-**Context:** The original coupon entity used `isUsed: boolean` — a single flag indicating
-whether a coupon had been consumed. This works for USER_SPECIFIC coupons (one user, one use)
-but breaks for GLOBAL coupons, which should be usable by any user but only once per user.
-`isUsed: true` would block the second user from using a GLOBAL coupon that the first user redeemed.
-
-**Options Considered:**
-- Option A: `isUsed: boolean` — simple, covers USER_SPECIFIC coupons, but a GLOBAL coupon blocked for everyone once any one user uses it
-- Option B: Separate coupon redemption table — maps couponCode → userId; correct but introduces a second store entity purely for junction data
-- Option C: `redeemedBy: string[]` on the coupon itself — single field encodes full redemption history; USER_SPECIFIC checks length > 0; GLOBAL checks `.includes(userId)`
-
-**Choice:** Option C — `redeemedBy: string[]`
-
-**Why:** The array encodes everything both coupon types need in one field with no join. For USER_SPECIFIC coupons, `redeemedBy.length > 0` is the used check (at most one entry). For GLOBAL coupons, `redeemedBy.includes(userId)` prevents the same user from double-redeeming while keeping the coupon open for other users. At redemption, a single `redeemedBy.push(userId)` is the only mutation. In production, this maps cleanly to a Postgres `coupon_redemptions(coupon_code, user_id, redeemed_at)` table with a unique constraint on `(coupon_code, user_id)` — the array becomes a `SELECT` on that table.
+Production fix: store all amounts as integer paise (₹2999.00 → 299900). Arithmetic on integers is exact; convert to decimal only at the JSON serialisation layer. This maps directly to a `BIGINT` column in Postgres — the standard for monetary amounts in financial databases. SOC2 Type II audits require stored financial values to be exactly representable, which eliminates floating-point at the storage layer.
 
 ---
 
-## Decision 10: Read-Only Preview Endpoint Instead of Two-Write Checkout
+## Decision 9: Read-Only Preview Endpoint Instead of Two-Write Checkout
 
 **Context:** A common question in checkout design is whether coupon application should
 be a separate step from order placement — "apply coupon → confirm checkout" rather than
@@ -192,27 +182,7 @@ state that must be managed between the two calls.
 
 ---
 
-## Decision 11: Floating-Point Money — A Known Limitation with a Clear Production Fix
-
-**Context:** All monetary values in this system — `price`, `discountAmount`, `total`,
-`totalRevenue` — are stored as TypeScript `number` (IEEE 754 double-precision float).
-JavaScript's floating-point arithmetic is famously imprecise: `0.1 + 0.2` evaluates to
-`0.30000000000000004`, not `0.3`. For a general-purpose API this is an aesthetic concern;
-for an InsurTech system processing premiums, claims, and refunds, it is a correctness
-issue that accumulates into material discrepancies at audit time.
-
-**Options Considered:**
-- Option A: `number` (IEEE 754) with display-layer rounding — simplest to implement; the `roundMoney()` helper in `GetStatsUseCase` takes this approach; does not solve drift in intermediate calculations, only in display output
-- Option B: Integer paise — store all amounts as integers (₹2999.50 → 299950 paise); arithmetic is exact because integers have no fractional representation; convert to decimal only at the JSON serialisation layer
-- Option C: `Decimal.js` / `big.js` — arbitrary-precision library; preserves decimal notation in code while preventing float drift; adds a dependency
-
-**Choice for this assignment:** Option A — `number` with `roundMoney()` rounding
-
-**Why, and what production demands:** Option A is acceptable for an in-memory exercise where no financial record is persisted across restarts. The `roundMoney()` helper prevents drift from appearing in API responses or stats. In production at Uniblox, Option B (integer paise) is the correct choice: it eliminates the root cause rather than masking it, has zero additional dependencies, and maps directly to a `BIGINT` column in Postgres — the standard representation for monetary amounts in financial databases. SOC2 Type II audits require that stored financial values are exactly representable, which eliminates Option A in a compliant system.
-
----
-
-## Decision 12: Idempotency — Checkout Request Replay
+## Decision 10: Idempotency — Checkout Request Replay
 
 **Context:** If a client sends the same checkout request twice — due to a network timeout,
 a mobile app retry, or a user double-tapping "Pay Now" — the current implementation
