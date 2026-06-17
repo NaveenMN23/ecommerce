@@ -1,28 +1,14 @@
 import { randomUUID } from 'crypto';
+import { config } from '../../config';
 
 /**
- * Central config for all discount parameters.
- *
- * In production these come from process.env or a feature-flag service
- * (e.g. LaunchDarkly) so thresholds can be tuned per carrier without a deploy.
+ * Re-export config as DISCOUNT_CONFIG so callers don't change.
+ * Values come from environment variables via src/config/index.ts —
+ * no code deploy needed to tune NTH_ORDER or discount percentages.
  */
 export const DISCOUNT_CONFIG = {
-  NTH_ORDER: 5, // every 5th order by a user earns a USER_SPECIFIC coupon
-
-  TIERS: {
-    USER_SPECIFIC: {
-      discountPercent: 10,
-      minOrderAmount: 1500, // coupon only applicable if cart >= ₹1500
-    },
-    GLOBAL_TIER1: {
-      discountPercent: 7.5,
-      minOrderAmount: 1500,
-    },
-    GLOBAL_TIER2: {
-      discountPercent: 10,
-      minOrderAmount: 2000,
-    },
-  },
+  NTH_ORDER: config.NTH_ORDER,
+  TIERS: config.DISCOUNT_TIERS,
 };
 
 /**

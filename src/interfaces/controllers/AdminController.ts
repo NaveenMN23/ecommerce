@@ -20,7 +20,7 @@ export class AdminController {
         tier,
       });
 
-      res.json({ success: true, ...result });
+      res.json(result);
     } catch (err) {
       next(err);
     }
@@ -35,7 +35,7 @@ export class AdminController {
     }
   }
 
-  static getUserStats(req: Request, res: Response, next: NextFunction): void {
+  static getUserStats(req: Request<{ userId: string }>, res: Response, next: NextFunction): void {
     try {
       const { userId } = req.params;
       const stats = new GetStatsUseCase(store).executeForUser(userId);

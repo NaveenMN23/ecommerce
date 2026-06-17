@@ -3,7 +3,7 @@ import { store } from '../../infrastructure/store/InMemoryStore';
 import { CheckoutUseCase } from '../../application/checkout/CheckoutUseCase';
 
 export class CheckoutController {
-  static checkout(req: Request, res: Response, next: NextFunction): void {
+  static checkout(req: Request<{ userId: string }>, res: Response, next: NextFunction): void {
     try {
       const { userId } = req.params;
       const { couponCode } = req.body;

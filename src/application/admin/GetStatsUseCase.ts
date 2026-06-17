@@ -5,7 +5,7 @@ import { Order } from '../../domain/entities/Order';
 interface TopProduct {
   productId: string;
   name: string;
-  value: number; // unitsSold or revenue depending on context
+  value: number;
 }
 
 interface GlobalStatsResult {
@@ -31,43 +31,28 @@ interface UserStatsResult {
 export class GetStatsUseCase {
   constructor(private readonly store: AppStore) {}
 
-  /** Overall store-wide stats */
   execute(): GlobalStatsResult {
     const orders = Array.from(this.store.orders.values());
     const base = this.aggregateBase(orders);
 
-    // Tally units sold and revenue per product across all orders
     const unitsSold = new Map<string, { name: string; units: number; revenue: number }>();
     for (const order of orders) {
       for (const item of order.items) {
-        const existing = unitsSold.get(item.productId) ?? { name: item.name, units: 0, revenue: 0 };
-        existing.units += item.quantity;
-        existing.revenue += item.price * item.quantity;
-        unitsSold.set(item.productId, existing);
-      }
-    }
-
-    let topSelling: TopProduct | null = null;
-    let topRevenue: TopProduct | null = null;
-
-    for (const [productId, data] of unitsSold) {
-      if (!topSelling || data.units > topSelling.value) {
-        topSelling = { productId, name: data.name, value: data.units };
-      }
-      if (!topRevenue || data.revenue > topRevenue.value) {
-        topRevenue = { productId, name: data.name, value: Math.round(data.revenue * 100) / 100 };
+        const entry = unitsSold.get(item.productId) ?? { name: item.name, units: 0, revenue: 0 };
+        entry.units += item.quantity;
+        entry.revenue += item.price * item.quantity;
+        unitsSold.set(item.productId, entry);
       }
     }
 
     return {
       ...base,
-      topSellingProduct: topSelling,
-      topRevenueProduct: topRevenue,
+      topSellingProduct: this.findTopBy(unitsSold, 'units'),
+      topRevenueProduct: this.findTopBy(unitsSold, 'revenue'),
       coupons: Array.from(this.store.coupons.values()),
     };
   }
 
-  /** Stats scoped to a single user */
   executeForUser(userId: string): UserStatsResult {
     const userOrders = Array.from(this.store.orders.values()).filter(
       (o) => o.userId === userId
@@ -77,26 +62,19 @@ export class GetStatsUseCase {
     );
     const base = this.aggregateBase(userOrders);
 
-    // Find this user's most purchased product
-    const unitsByProduct = new Map<string, { name: string; units: number }>();
+    const unitsByProduct = new Map<string, { name: string; units: number; revenue: number }>();
     for (const order of userOrders) {
       for (const item of order.items) {
-        const existing = unitsByProduct.get(item.productId) ?? { name: item.name, units: 0 };
-        existing.units += item.quantity;
-        unitsByProduct.set(item.productId, existing);
-      }
-    }
-
-    let favorite: TopProduct | null = null;
-    for (const [productId, data] of unitsByProduct) {
-      if (!favorite || data.units > favorite.value) {
-        favorite = { productId, name: data.name, value: data.units };
+        const entry = unitsByProduct.get(item.productId) ?? { name: item.name, units: 0, revenue: 0 };
+        entry.units += item.quantity;
+        entry.revenue += item.price * item.quantity;
+        unitsByProduct.set(item.productId, entry);
       }
     }
 
     return {
       ...base,
-      favoriteProduct: favorite,
+      favoriteProduct: this.findTopBy(unitsByProduct, 'units'),
       orders: userOrders,
       coupons: userCoupons,
     };
@@ -116,8 +94,26 @@ export class GetStatsUseCase {
     return {
       totalOrders: orders.length,
       totalItemsPurchased,
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      totalDiscountGiven: Math.round(totalDiscountGiven * 100) / 100,
+      totalRevenue: this.roundMoney(totalRevenue),
+      totalDiscountGiven: this.roundMoney(totalDiscountGiven),
     };
+  }
+
+  private findTopBy(
+    map: Map<string, { name: string; units: number; revenue: number }>,
+    key: 'units' | 'revenue'
+  ): TopProduct | null {
+    let top: TopProduct | null = null;
+    for (const [productId, data] of map) {
+      const value = this.roundMoney(data[key]);
+      if (!top || value > top.value) {
+        top = { productId, name: data.name, value };
+      }
+    }
+    return top;
+  }
+
+  private roundMoney(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 }

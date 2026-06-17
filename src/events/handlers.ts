@@ -1,36 +1,32 @@
 import { eventBus } from './EventBus';
 import { store } from '../infrastructure/store/InMemoryStore';
-import {
-  isNthOrder,
-  generateCouponCode,
-  DISCOUNT_CONFIG,
-} from '../domain/rules/DiscountRule';
+import { isNthOrder } from '../domain/rules/DiscountRule';
+import { GenerateCouponUseCase } from '../application/admin/GenerateCouponUseCase';
+import { logger } from '../utils/logger';
 
 /**
  * Listens for 'order.placed' and auto-generates a USER_SPECIFIC coupon
  * when the user hits an nth-order milestone.
  *
- * Runs after checkout completes — failure here does NOT roll back the order.
- * This is the fan-out: CheckoutUseCase emits once, any number of handlers react.
+ * Delegates to GenerateCouponUseCase — single source of truth for coupon creation.
+ * Failure here does NOT roll back the order (fire-and-forget semantics).
  */
 export function registerCouponHandler(): void {
   eventBus.on('order.placed', ({ userId, userCount }) => {
     if (!isNthOrder(userCount)) return;
 
-    const code = generateCouponCode();
-    store.coupons.set(code, {
-      code,
+    const result = new GenerateCouponUseCase(store).execute({
       type: 'USER_SPECIFIC',
       userId,
-      discountPercent: DISCOUNT_CONFIG.TIERS.USER_SPECIFIC.discountPercent,
-      minOrderAmount: DISCOUNT_CONFIG.TIERS.USER_SPECIFIC.minOrderAmount,
-      redeemedBy: [],
-      createdAt: new Date(),
     });
 
-    console.log(
-      `[CouponHandler] 🎉 Coupon ${code} generated for '${userId}' — order #${userCount} milestone`
-    );
+    if (result.success && result.coupon) {
+      logger.info('Coupon generated via nth-order milestone', {
+        couponCode: result.coupon.code,
+        userId,
+        orderCount: userCount,
+      });
+    }
   });
 }
 
@@ -40,10 +36,12 @@ export function registerCouponHandler(): void {
  */
 export function registerAnalyticsHandler(): void {
   eventBus.on('order.placed', ({ order, userId }) => {
-    console.log(
-      `[AnalyticsHandler] Order ${order.id} placed by '${userId}' — ` +
-      `total: ₹${order.total}, discount: ₹${order.discountAmount}`
-    );
+    logger.info('Order placed', {
+      orderId: order.id,
+      userId,
+      total: order.total,
+      discountAmount: order.discountAmount,
+    });
   });
 }
 

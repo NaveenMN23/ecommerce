@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { store } from '../../infrastructure/store/InMemoryStore';
 import { AddToCartUseCase } from '../../application/cart/AddToCartUseCase';
-import { AppError } from '../../domain/errors/AppError';
+import { AppError, CartNotFoundError } from '../../domain/errors/AppError';
 
 export class CartController {
-  static addItem(req: Request, res: Response, next: NextFunction): void {
+  static addItem(req: Request<{ userId: string }>, res: Response, next: NextFunction): void {
     try {
       const { userId } = req.params;
       const { productId, quantity } = req.body;
@@ -24,15 +24,11 @@ export class CartController {
     }
   }
 
-  static viewCart(req: Request, res: Response, next: NextFunction): void {
+  static viewCart(req: Request<{ userId: string }>, res: Response, next: NextFunction): void {
     try {
       const { userId } = req.params;
       const cart = store.carts.get(userId);
-
-      if (!cart) {
-        res.json({ success: true, cart: { userId, items: [], total: 0 } });
-        return;
-      }
+      if (!cart) throw new CartNotFoundError(userId);
 
       const total = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       res.json({ success: true, cart, total });
