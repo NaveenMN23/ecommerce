@@ -1,0 +1,264 @@
+{
+  "info": {
+    "name": "Uniblox E-Commerce API",
+    "_postman_id": "uniblox-ecommerce-v2",
+    "description": "Happy path flow:\n1. Browse products\n2. Add items to cart\n3. Preview checkout (no side effects)\n4. Checkout (repeat Nth times to hit milestone)\n5. Coupon is AUTO-generated after Nth checkout — check GET /api/admin/coupons\n6. Checkout with coupon code\n7. View your order history\n8. Check admin stats\n\nBase URL: http://localhost:3000\nRun `npm run dev` before testing.\n\nSet the `couponCode` collection variable after a coupon appears in List All Coupons.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",    "value": "http://localhost:3000", "type": "string" },
+    { "key": "userId",     "value": "user1",                 "type": "string" },
+    { "key": "couponCode", "value": "",                      "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Products",
+      "item": [
+        {
+          "name": "List All Products",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/products",
+            "description": "Returns all 5 seeded products with current stock levels. Use product IDs (p1–p5) in cart requests."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Cart",
+      "item": [
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/cart/{{userId}}/items",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"p1\",\n  \"quantity\": 2\n}"
+            },
+            "description": "Adds Wireless Headphones (p1) × 2 to the cart. Price is snapshotted at add-time.\n\nADD semantics — if p1 is already in the cart, quantity accumulates. Use PUT to set an absolute quantity."
+          }
+        },
+        {
+          "name": "Add Second Item",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/cart/{{userId}}/items",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"p3\",\n  \"quantity\": 1\n}"
+            },
+            "description": "Adds USB-C Hub (p3) × 1. Cart now has 2 items."
+          }
+        },
+        {
+          "name": "View Cart",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/cart/{{userId}}",
+            "description": "Returns cart contents with running total."
+          }
+        },
+        {
+          "name": "Update Item Quantity",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/cart/{{userId}}/items/p1",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1\n}"
+            },
+            "description": "Sets the quantity of p1 to an absolute value (SET semantics — not additive).\n\nUse this to reduce a quantity after stock has dropped. Stock check validates against the new absolute quantity, not the delta.\n\nPass quantity: 0 to remove the item without calling DELETE."
+          }
+        },
+        {
+          "name": "Remove Item from Cart",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/cart/{{userId}}/items/p3",
+            "description": "Removes USB-C Hub (p3) from the cart entirely. Returns the updated cart."
+          }
+        },
+        {
+          "name": "Add — Exceed Stock (Error Case)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/cart/{{userId}}/items",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"p4\",\n  \"quantity\": 999\n}"
+            },
+            "description": "Expected: 400 InsufficientStockError. Webcam HD (p4) has only 20 units."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Checkout",
+      "item": [
+        {
+          "name": "Preview Checkout (No Side Effects)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/checkout/{{userId}}/preview",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"couponCode\": \"{{couponCode}}\"\n}"
+            },
+            "description": "Runs all checkout validations and returns the price breakdown — without placing an order or consuming the coupon.\n\nThe coupon's redeemedBy list is NOT updated. Use this to show the user their discounted total before confirming payment.\n\ncouponCode is optional — leave blank for a preview without discount."
+          }
+        },
+        {
+          "name": "Checkout Without Coupon",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/checkout/{{userId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "description": "Places an order. Stock is decremented, cart cleared.\n\nResponse includes nextCouponAt — orders remaining until the next coupon milestone.\n\nWhen nextCouponAt reaches 0, a USER_SPECIFIC coupon is AUTO-GENERATED by the event handler and will appear in GET /api/admin/coupons. No admin action needed."
+          }
+        },
+        {
+          "name": "Checkout With Coupon",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/checkout/{{userId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"couponCode\": \"{{couponCode}}\"\n}"
+            },
+            "description": "Checkout with a discount coupon.\n\n- USER_SPECIFIC: only redeemable by the user it was issued to; single-use globally.\n- GLOBAL: any user can redeem it, but each user can only use it once.\n\nExpected: discount applied, userId added to coupon's redeemedBy list."
+          }
+        },
+        {
+          "name": "Checkout — Empty Cart (Error Case)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/checkout/user2",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "description": "Expected: 404 CartNotFoundError. user2 has no cart."
+          }
+        },
+        {
+          "name": "Checkout — Reuse Coupon (Error Case)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/checkout/{{userId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"couponCode\": \"{{couponCode}}\"\n}"
+            },
+            "description": "Run after 'Checkout With Coupon'.\n\n- USER_SPECIFIC: Expected 400 CouponAlreadyUsedError (globally spent).\n- GLOBAL: Expected 400 — you have already used this coupon."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Order History",
+      "item": [
+        {
+          "name": "Get Order History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/orders/{{userId}}",
+            "description": "Returns all orders placed by the user, sorted newest-first.\n\nIncludes totalOrders and totalSpend summary.\n\nThis is the user-facing endpoint — distinct from GET /api/admin/stats/:userId which is admin-scoped and mixes aggregate stats with order data.\n\nReturns 404 if the user has not placed any orders yet."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Admin — Coupons",
+      "item": [
+        {
+          "name": "Generate USER_SPECIFIC Coupon (Manual Override)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/admin/coupons/generate",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"USER_SPECIFIC\",\n  \"userId\": \"user1\"\n}"
+            },
+            "description": "Manual override only — USER_SPECIFIC coupons are AUTO-GENERATED by the checkout event handler on every Nth order. You do NOT need to call this after a successful checkout.\n\nUse this endpoint only to test the milestone logic manually or as a fallback if the event handler failed.\n\nReturns success:false if user hasn't hit the milestone — valid business state, not an error."
+          }
+        },
+        {
+          "name": "Generate GLOBAL Coupon (TIER1)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/admin/coupons/generate",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GLOBAL\",\n  \"tier\": \"TIER1\"\n}"
+            },
+            "description": "GLOBAL coupons are always manual — admin decides when to run a campaign.\n\nTIER1: 7.5% off on orders above ₹1500. Any user can redeem it, but each user can only use it once (tracked via redeemedBy[])."
+          }
+        },
+        {
+          "name": "Generate GLOBAL Coupon (TIER2)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/admin/coupons/generate",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GLOBAL\",\n  \"tier\": \"TIER2\"\n}"
+            },
+            "description": "GLOBAL TIER2: 10% off on orders above ₹2000. Higher discount, higher minimum threshold."
+          }
+        },
+        {
+          "name": "List All Coupons",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/coupons",
+            "description": "Lists every coupon — USER_SPECIFIC and GLOBAL.\n\nThe `redeemedBy` field shows which user IDs have consumed each coupon:\n- Empty array [] = unused\n- USER_SPECIFIC: max 1 entry (globally single-use)\n- GLOBAL: one entry per user who has redeemed it (single-use per user)\n\nAfter every Nth checkout, a new USER_SPECIFIC coupon will appear here automatically."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Admin — Stats",
+      "item": [
+        {
+          "name": "Store-Wide Stats",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/stats",
+            "description": "Returns aggregate store metrics:\n- totalOrders, totalItemsPurchased, totalRevenue, totalDiscountGiven\n- topSellingProduct: product with the highest total units sold\n- topRevenueProduct: product that generated the most revenue\n- All coupons with redemption status"
+          }
+        },
+        {
+          "name": "Stats for user1",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/stats/user1",
+            "description": "Per-user stats scoped to user1 (admin view):\n- totalOrders, totalItemsPurchased, totalRevenue, totalDiscountGiven\n- favoriteProduct: the product user1 has purchased most\n- orders[]: full order history with itemised details\n- coupons: coupons issued to or redeemed by user1\n\nFor a user-facing order list (without admin stats), use GET /api/orders/:userId instead."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health",
+            "description": "Returns server status and timestamp. Useful for readiness probes."
+          }
+        }
+      ]
+    }
+  ]
+}
